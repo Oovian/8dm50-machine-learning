@@ -153,6 +153,35 @@ def random_brightness(image, brightness_range=(-0.2, 0.2)):
 
     return augmented_image
 
+# B-spline geometric augmentation using gryds
+
+def b_spline_transform(image, deformation_grid=None, sigma=0.008):
+    """ Perform B-spline deformation using the gryds package on RGB or grayscale image. """
+    
+    # Ensure the image has 2D spatial dimensions (height, width), RGB or grayscale
+    height, width = image.shape[:2]
+
+    # Define the B-spline transformation for the 2D spatial dimensions (height, width)
+    if deformation_grid is None:
+        grid = [4, 4]  # Adjust grid for more or less deformation
+        random_offsets = np.random.randn(2, *grid) * sigma  # 2D offsets for height and width
+        deformation_grid = gryds.BSplineTransformation(random_offsets)
+    
+    # Create an interpolator for the image (interpolating the whole image at once)
+    interpolator = gryds.Interpolator(image[..., 0])
+
+    # Apply the B-spline transformation to the entire image (each channel separately, but with the same deformation)
+    transformed_image = np.zeros_like(image)  # Initialize the output image
+    for i in range(image.shape[-1]):  # Loop over channels
+        interpolator = gryds.Interpolator(image[..., i])  # Interpolate each channel
+        transformed_image[..., i] = interpolator.transform(deformation_grid, mode='nearest', cval=np.mean(image[..., i]))
+
+
+    # Clip the output to ensure values remain in the range [0, 1]
+    transformed_image = np.clip(transformed_image, 0, 1)
+
+    return transformed_image
+
 # Create a very simple datagenerator
 def BrightnessArgu(images, segmentations, patch_size, patches_per_im, batch_size):
     """
@@ -184,3 +213,33 @@ def BrightnessArgu(images, segmentations, patch_size, patches_per_im, batch_size
 
             yield x_batch, y_batch
 
+# Create a very simple datagenerator
+def Bspline_generator(images, segmentations, patch_size, patches_per_im, batch_size):
+    """
+    Simple data-generator to feed patches in batches to the network.
+    To extract different patches each epoch, steps_per_epoch in fit_generator should be equal to nr_batches.
+
+    :param images: Input images
+    :param segmentations: Corresponding segmentations
+    :param patch_size: Desired patch size
+    :param patches_per_im: Amount of patches to extract per image
+    :param batch_size: Number of patches per batch
+    :return: Batch of patches to feed to the model
+    """
+    # Total number of patches generated per epoch
+    total_patches = len(images) * patches_per_im
+    nr_batches = int(np.ceil(total_patches / batch_size))
+
+    while True:
+        # Extract patches
+        x, y = extract_patches(images, segmentations, patch_size, patches_per_im, seed=np.random.randint(0, 500))
+
+        for idx in range(nr_batches):
+            x_batch = x[idx * batch_size:(idx + 1) * batch_size]
+            y_batch = y[idx * batch_size:(idx + 1) * batch_size]
+
+            # Apply random brightness augmentation to each image patch in the batch
+            for i in range(len(x_batch)):
+                x_batch[i] = b_spline_transform(x_batch[i])
+
+            yield x_batch, y_batch
