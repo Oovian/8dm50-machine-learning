@@ -124,10 +124,63 @@ def datagenerator(images, segmentations, patch_size, patches_per_im, batch_size)
     while True:
         # Each epoch extract different patches from the training images
         x, y = extract_patches(images, segmentations, patch_size, patches_per_im, seed=np.random.randint(0, 500))
-
+        
         # Feed data in batches to the network
+        for idx in range(nr_batches):
+            
+            x_batch = x[idx * batch_size:(idx + 1) * batch_size]
+            y_batch = y[idx * batch_size:(idx + 1) * batch_size]
+            
+            yield x_batch, y_batch
+
+def random_brightness(image, brightness_range=(-0.2, 0.2)):
+    """
+    Apply random brightness augmentation to an image by adding a random offset
+    to the pixel values within the brightness_range.
+
+    :param image: Input image (assumed to be normalized to [0, 1] range).
+    :param brightness_range: Tuple specifying the range of brightness change (min, max).
+    :return: Brightness-augmented image.
+    """
+    # Generate a random brightness offset
+    brightness_offset = np.random.uniform(low=brightness_range[0], high=brightness_range[1])
+
+    # Apply the brightness offset by adding it to the image
+    augmented_image = image + brightness_offset
+
+    # Clip the pixel values to ensure they remain in the [0, 1] range (or [0, 255] if unnormalized)
+    augmented_image = np.clip(augmented_image, 0, 1)
+
+    return augmented_image
+
+# Create a very simple datagenerator
+def BrightnessArgu(images, segmentations, patch_size, patches_per_im, batch_size):
+    """
+    Simple data-generator to feed patches in batches to the network.
+    To extract different patches each epoch, steps_per_epoch in fit_generator should be equal to nr_batches.
+
+    :param images: Input images
+    :param segmentations: Corresponding segmentations
+    :param patch_size: Desired patch size
+    :param patches_per_im: Amount of patches to extract per image
+    :param batch_size: Number of patches per batch
+    :return: Batch of patches to feed to the model
+    """
+    # Total number of patches generated per epoch
+    total_patches = len(images) * patches_per_im
+    nr_batches = int(np.ceil(total_patches / batch_size))
+
+    while True:
+        # Extract patches
+        x, y = extract_patches(images, segmentations, patch_size, patches_per_im, seed=np.random.randint(0, 500))
+
         for idx in range(nr_batches):
             x_batch = x[idx * batch_size:(idx + 1) * batch_size]
             y_batch = y[idx * batch_size:(idx + 1) * batch_size]
+
+            # Apply random brightness augmentation to each image patch in the batch
+            for i in range(len(x_batch)):
+                x_batch[i] = random_brightness(x_batch[i])
+
             yield x_batch, y_batch
 
