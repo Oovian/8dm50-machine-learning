@@ -214,7 +214,7 @@ def BrightnessArgu(images, segmentations, patch_size, patches_per_im, batch_size
             yield x_batch, y_batch
 
 # Create a very simple datagenerator
-def Bspline_generator(images, segmentations, patch_size, patches_per_im, batch_size):
+def Bspline_brightness_argu_generator(images, segmentations, patch_size, patches_per_im, batch_size):
     """
     Simple data-generator to feed patches in batches to the network.
     To extract different patches each epoch, steps_per_epoch in fit_generator should be equal to nr_batches.
@@ -238,8 +238,9 @@ def Bspline_generator(images, segmentations, patch_size, patches_per_im, batch_s
             x_batch = x[idx * batch_size:(idx + 1) * batch_size]
             y_batch = y[idx * batch_size:(idx + 1) * batch_size]
 
-            # Apply random brightness augmentation to each image patch in the batch
+            # Apply random brightness augmentation and b-spline argumentation to each image patch in the batch
             for i in range(len(x_batch)):
+                x_batch[i] = random_brightness(x_batch[i])
                 x_batch[i] = b_spline_transform(x_batch[i])
 
             yield x_batch, y_batch
